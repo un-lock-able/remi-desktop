@@ -7,6 +7,14 @@ on:
     branches: [main]
   pull_request:
 
+# A push supersedes the run still outstanding for the commit before it. Without this they all
+# stay alive, and on a fork pull request every one of them waits on its own approval — approving
+# the newest does not release the rest, so they sit there until the pull request is merged and
+# they are all closed out as failures at once.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
