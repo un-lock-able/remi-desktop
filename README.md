@@ -7,8 +7,7 @@ session: thinking, reading, writing, replying, proud when a turn lands. The one 
 when the agent is **blocked waiting for your approval**, she stands there waiting, and you
 notice without watching the terminal.
 
-**Claude Code is the harness supported today.** Remi is not built around it, though — see
-[Harnesses](#harnesses).
+**Claude Code and Codex are supported.** See [Harnesses](#harnesses) for setup and event coverage.
 
 The session can be on this machine or on any host you already `ssh` to, and she keeps showing
 the right thing **while you are detached from it** — which is the entire point. A hook on the
@@ -22,39 +21,82 @@ Grab the latest release. In short:
 |---|---|
 | macOS 11+ | `Remi-*-macos-universal.app.tar.gz` → `/Applications`, then `xattr -dr com.apple.quarantine /Applications/Remi.app` |
 | Windows 10/11 | `Remi-*-windows-x86_64.msi` or `-setup.exe` |
-| Linux | not a priority, no release build — see below |
-| any machine running an agent | `curl -fsSL .../releases/latest/download/install.sh \| sh` |
+| Linux x86_64 | `Remi-*-linux-x86_64.deb` or `.AppImage` — X11 / XWayland recommended |
+| any machine running an agent | `curl -fsSL .../releases/latest/download/install.sh \| sh -s -- --harness claude-code --check` |
 
-Nothing is code-signed yet, so both platforms will warn on first launch. The release notes carry
+Nothing is code-signed yet, so macOS and Windows will warn on first launch. The release notes carry
 the exact incantations.
 
-Remi has **no Dock icon and no tray**: right-click her for the session menu — pick a session,
-connect to a host, resize, quit.
+Remi has **no Dock icon**. Use the tray icon or right-click her for the session menu — pick a
+session, connect to a host, resize, hide, quit.
 
 ### Linux
 
-Linux is not a priority for the pet, and no Linux build is released. It builds and runs, but
-Wayland's `xdg-shell` has no request for a client to set its own position, keep itself above
-other windows, or leave the taskbar — by design, whatever the toolkit. On KDE Plasma the
-compositor can do all of that for her: add a window rule (System Settings → Window Management →
-Window Rules, or focus the pet and press Alt+F3 → More Actions → Configure Special Window
-Settings) matching her window class, with
+The release workflow builds `.deb` and AppImage packages for Linux x86_64. Install the `.deb`
+with `sudo apt install ./Remi-*-linux-x86_64.deb`, or make the AppImage executable and run it.
+For a checkout whose changes have not been released yet, build locally using the commands below.
+
+Remi prefers **X11 / XWayland**, which allows position restoration and always-on-top requests.
+GTK falls back to native Wayland if X11 is unavailable. An explicit `GDK_BACKEND` overrides
+this choice, for example `GDK_BACKEND=wayland remi-desktop` or `GDK_BACKEND=x11 remi-desktop`.
+Install/enable XWayland in a Wayland session for the full desktop-pet behavior.
+
+Native Wayland still leaves positioning, stacking and taskbar visibility to the compositor.
+On KDE Plasma, add a window rule (System Settings → Window Management → Window Rules)
+matching Remi's window class:
 
 | property | setting |
 |---|---|
 | Position | Remember |
 | Keep above other windows | Apply initially · Yes |
-| Skip taskbar | Apply initially · Yes |
-| Skip pager | Apply initially · Yes |
-| Skip switcher | Apply initially · Yes |
+| Skip taskbar / pager / switcher | Apply initially · Yes |
 
-The menu bar icon needs `libappindicator` at build and run time —
-`libayatana-appindicator3-dev` on Debian/Ubuntu, `libappindicator-gtk3-devel` on Fedora,
-`libappindicator-gtk3` on Arch. KDE Plasma shows it natively; GNOME needs the AppIndicator
-extension, without which there is no tray at all and the pet's own right-click menu is the only
-way to hers.
+The tray needs AppIndicator (`libayatana-appindicator3-1` on Debian/Ubuntu,
+`libappindicator-gtk3` on Arch). KDE Plasma shows it natively; GNOME needs its AppIndicator
+extension. Right-clicking the pet also opens the menu.
 
-`remi-hook` is fully supported on Linux, which is where the agent usually runs.
+`Remi-*-linux-x86_64.deb` and `.AppImage` are the pet as macOS and Windows ship her: Spine only.
+WebKitGTK does not always composite the transparent WebGL canvas that renderer draws into, and a
+pet that fails that way is invisible rather than merely ugly — she says so in a message on the
+window, but there is nothing to see. If that happens, install the `-gif-fallback` package
+instead: the same build plus 8.5 MiB of GIF art the renderer falls back to. The feature is off
+by default, so a local build has no GIF art unless you pass `--features gif-fallback` yourself.
+
+### Agent hook setup
+
+On each machine running an agent, install `remi-hook` and configure every harness you use.
+The release installer requires the harness explicitly:
+
+```sh
+curl -fsSL https://github.com/un-lock-able/remi-desktop/releases/latest/download/install.sh \
+  | sh -s -- --harness claude-code --check
+```
+
+Replace `claude-code` with `codex` for Codex. From a source checkout, install and configure the
+same way:
+
+```sh
+cargo install --path crates/remi-hook --locked
+~/.cargo/bin/remi-hook setup --harness claude-code --check
+# or: ~/.cargo/bin/remi-hook setup --harness codex --check
+```
+
+Claude Code setup merges Remi's hooks into its `settings.json`; restart Claude Code afterwards.
+Codex setup merges into `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`) without editing
+`config.toml` or replacing `notify`. Restart Codex, then use **`/hooks` in the CLI to review and
+trust the Remi hooks**, as required by
+[Codex's hook trust flow](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks).
+`check` verifies the file, not that trust decision. Desktop and IDE clients must load the same
+`CODEX_HOME` configuration.
+
+Run setup once per harness when both are installed. Check or remove one harness explicitly:
+
+```sh
+remi-hook check --harness codex
+remi-hook uninstall --harness codex
+```
+
+`--harness` is required throughout; Remi does not guess which agent a machine runs.
 
 ## How it works
 
@@ -86,7 +128,7 @@ which harness it came from.
 |---|---|
 | **Claude Code** | supported. `remi-hook setup --harness claude-code` merges Remi's hooks into your `settings.json`, keeping your own hooks and a `.bak`. |
 | **OpenCode** | next. It gets a plugin rather than hooks; the event vocabulary is already the shared one. |
-| **Codex** | under investigation. It has no hook system — its only push fires on turn completion — so following it means tailing its rollout log, and whether approval requests even appear there is unverified. `docs/IMPLEMENTATION-PLAN.md` §3.6 has the findings. |
+| **Codex** | supported through lifecycle hooks: `remi-hook setup --harness codex --check`. See [Agent hook setup](#agent-hook-setup). |
 
 Adding a harness should cost one file under `harness/` plus a config variant. If it ever costs
 more than that, the neutral vocabulary is wrong and wants fixing rather than working around.
@@ -95,6 +137,16 @@ more than that, the neutral vocabulary is wrong and wants fixing rather than wor
 was decided and why, including the alternatives that were rejected.
 
 ## Building from source
+
+Linux needs Rust, a C/C++ build toolchain, GTK 3, WebKitGTK 4.1 and AppIndicator development
+packages. On Debian/Ubuntu:
+
+```sh
+sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev \
+  libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev
+```
+
+On Arch: `sudo pacman -S --needed base-devel rust pkgconf webkit2gtk-4.1 libappindicator-gtk3 librsvg patchelf`.
 
 ```sh
 cargo test --workspace          # all three crates
@@ -106,7 +158,9 @@ The frontend has **no build step**: static files and ES modules under `crates/re
 with `spine-webgl` vendored. `build.rs` stages the Spine art into `ui/assets/` on every build.
 
 Bundling the app needs the Tauri CLI (`cargo install tauri-cli --version "^2.11"`), then
-`cargo tauri build` from `crates/remi-desktop`. On macOS that also merges `Info.plist`, which is
+`cargo tauri build` from `crates/remi-desktop` (on Linux, what the release builds:
+`cargo tauri build --bundles deb,appimage --features gif-fallback`).
+On macOS that also merges `Info.plist`, which is
 what makes the bundle Dock-less — `cargo run` never does, so the dev loop always has a Dock icon.
 
 ## License

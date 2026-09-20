@@ -38,7 +38,8 @@ export async function mount(rootEl) {
     probe.onerror = () =>
       reject(
         new Error(
-          "the GIF art is not in this build — rebuild with `--features gif-fallback`",
+          "the GIF art is not in this build — on Linux install the `-gif-fallback` package, " +
+            "otherwise rebuild with `--features gif-fallback`",
         ),
       );
     probe.src = `assets/gif/${GIF.writing}`;

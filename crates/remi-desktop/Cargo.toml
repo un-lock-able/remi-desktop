@@ -30,6 +30,9 @@ toml = "1.1.6"
 [target.'cfg(target_os = "macos")'.dependencies]
 tauri-nspanel = "2.1"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gdk = "0.18.2"
+
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
 
