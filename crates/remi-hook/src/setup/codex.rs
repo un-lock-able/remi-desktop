@@ -114,8 +114,28 @@ mod tests {
             value["hooks"]["Stop"][1]["hooks"][0]["command"],
             "'/opt/Remi Desktop/remi-hook' signal turn-end --harness codex"
         );
+        // The override Codex runs on Windows: the same path, never quoted.
+        assert_eq!(
+            value["hooks"]["Stop"][1]["hooks"][0]["commandWindows"],
+            "/opt/Remi Desktop/remi-hook signal turn-end --harness codex"
+        );
         assert_eq!(value["hooks"]["Interrupt"][0]["hooks"][0]["timeout"], 3);
         assert!(value["hooks"].get("PostToolUseFailure").is_none());
+        // Hooks an older remi wrote, without the override, are still recognised as remi's —
+        // so `check` reports them and `uninstall` takes them out — but do not match what
+        // `setup` writes now, which is what sends the user to run it again.
+        let mut stale: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        stale["hooks"]["Stop"][1]["hooks"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("commandWindows");
+        std::fs::write(&path, serde_json::to_vec(&stale).unwrap()).unwrap();
+        let inspection = inspect(&path, program).unwrap();
+        assert_eq!(inspection.missing.len(), 1);
+        assert_eq!(inspection.unexpected.len(), 1);
+        assert!(inspection.unexpected[0].command_windows.is_none());
+
+        install(&path, program).unwrap();
         assert_eq!(uninstall(&path).unwrap().removed, HOOKS.len());
         let value: Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
         assert_eq!(value, original);

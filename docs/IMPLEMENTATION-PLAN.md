@@ -529,6 +529,22 @@ hooks and backs up the previous file. Setup, check and uninstall select the adap
 `--harness codex`. The user reviews and trusts new or changed hooks through Codex's `/hooks`
 flow; installation does not change trust, `config.toml` or existing `notify` commands.
 
+Every Codex hook entry carries both `command` — the POSIX spelling, single-quoted when the path
+needs it — and `commandWindows`, the same path written plain. Codex runs a hook as
+`cmd.exe /e:ON /v:OFF /d /c "<command>"`, and cmd's quote stripping loses the program token of a
+command line whose first character is a quote, so the quoted spelling never launches there
+(openai/codex#46454) and an unquoted one is the only form that works. A path containing a space
+has neither, and setup cannot produce a working command for one. The override is written on
+every platform rather than under `cfg(windows)`: one code path, exercised by the tests on each
+CI runner, and a `$CODEX_HOME` shared between machines — a dotfiles repository, a synced home —
+reads the same on all of them instead of each machine reporting the other's hooks as unexpected.
+An install that predates the override is still recognised as remi's, so `check` reports the
+mismatch and sends the user to `setup` again.
+
+⚠️ **Claude Code gets no `commandWindows`.** Its settings schema forbids unknown keys in a hook
+entry, and a file that fails validation stops it with a dialog at session start. Its hooks are
+therefore still unusable on Windows, which wants a fix of its own.
+
 | Codex event | Neutral signal | Result |
 |---|---|---|
 | `UserPromptSubmit` | `TurnStart` | thinking |
@@ -1429,7 +1445,7 @@ build it is.
 | `remi-hook` | `x86_64-pc-windows-msvc` | `windows-latest` |
 | `remi-desktop` | universal `.app` in a `.tar.gz`; `.msi` + NSIS `.exe` | `macos-14`, `windows-latest` |
 | `remi-desktop` on Linux | **x86_64**; X11/XWayland preferred, native Wayland requires compositor rules (brief §7) | `.deb`, `.AppImage`, each also as `-gif-fallback` carrying the GIF art (§5.5) |
-| `install.sh` + `SHASUMS256.txt` | — | attached to the release |
+| `install.sh` + `install.ps1` + `SHASUMS256.txt` | — | attached to the release |
 
 `remi-hook` needs the macOS and Windows targets even though remotes are Linux: the pet bundles
 it for its own platform to serve the `local` connection (§6.1). Conversely Linux `remi-hook` is

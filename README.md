@@ -18,15 +18,15 @@ remote writes a state file; nothing has to stay connected for the state to stay 
 One session, eight states — seven poses, since Writing and Replying share one. Remi holds
 whichever state that session is in until an event moves her out of it.
 
-| | state | when she shows it |
-|---|---|---|
-| <img src="assets/preview/thinking.gif" width="110"> | **Thinking** | The agent is working out what to do next — between the prompt and the first tool call, or between tool calls. |
-| <img src="assets/preview/viewing.gif" width="110"> | **Viewing** | Reading: a file read, a search, a listing. Pen in hand, on task. |
-| <img src="assets/preview/writing.gif" width="110"> | **Writing** · **Replying** | Changing files — an edit, a write, a patch — or putting words on your screen. Two states, deliberately one pose: a separate one would be a distinction without a difference. |
-| <img src="assets/preview/waiting-for-input.gif" width="110"> | **Waiting for input** | **Blocked on you** — a permission prompt, or a question. The state the whole pet exists for: she sits there waiting and you notice without watching the terminal. |
-| <img src="assets/preview/proud.gif" width="110"> | **Proud** | The turn just landed. Fades to Idle after a few seconds. |
-| <img src="assets/preview/idle.gif" width="110"> | **Idle** | Between turns: what Proud fades into, or a turn you interrupted. Empty-handed rest. |
-| <img src="assets/preview/offline.gif" width="110"> | **Offline** | No session — it ended, or the host went away. The same rest as Idle, greyed and dimmed so it reads as "nothing running" from across the room. |
+|                                                              | state                      | when she shows it                                                                                                                                                            |
+| ------------------------------------------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="assets/preview/thinking.gif" width="110">          | **Thinking**               | The agent is working out what to do next — between the prompt and the first tool call, or between tool calls.                                                                |
+| <img src="assets/preview/viewing.gif" width="110">           | **Viewing**                | Reading: a file read, a search, a listing. Pen in hand, on task.                                                                                                             |
+| <img src="assets/preview/writing.gif" width="110">           | **Writing** · **Replying** | Changing files — an edit, a write, a patch — or putting words on your screen. Two states, deliberately one pose: a separate one would be a distinction without a difference. |
+| <img src="assets/preview/waiting-for-input.gif" width="110"> | **Waiting for input**      | **Blocked on you** — a permission prompt, or a question. The state the whole pet exists for: she sits there waiting and you notice without watching the terminal.            |
+| <img src="assets/preview/proud.gif" width="110">             | **Proud**                  | The turn just landed. Fades to Idle after a few seconds.                                                                                                                     |
+| <img src="assets/preview/idle.gif" width="110">              | **Idle**                   | Between turns: what Proud fades into, or a turn you interrupted. Empty-handed rest.                                                                                          |
+| <img src="assets/preview/offline.gif" width="110">           | **Offline**                | No session — it ended, or the host went away. The same rest as Idle, greyed and dimmed so it reads as "nothing running" from across the room.                                |
 
 The previews are the GIF art, downscaled. The app renders the Spine skeleton, which is the same
 poses drawn by [森哈_Yeah](https://space.bilibili.com/2021405481) as a rig rather than as frames —
@@ -36,12 +36,13 @@ smoother, sharper, and it crossfades between states instead of cutting.
 
 Grab the latest release. In short:
 
-| | |
-|---|---|
-| macOS 11+ | `Remi-*-macos-universal.app.tar.gz` → `/Applications`, then `xattr -dr com.apple.quarantine /Applications/Remi.app` |
-| Windows 10/11 | `Remi-*-windows-x86_64.msi` or `-setup.exe` |
-| Linux x86_64 | `Remi-*-linux-x86_64.deb` or `.AppImage` — X11 / XWayland recommended |
-| any machine running an agent | `curl -fsSL .../releases/latest/download/install.sh \| sh -s -- --harness claude-code --check` |
+|                                         |                                                                                                                     |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| macOS 11+                               | `Remi-*-macos-universal.app.tar.gz` → `/Applications`, then `xattr -dr com.apple.quarantine /Applications/Remi.app` |
+| Windows 10/11                           | `Remi-*-windows-x86_64.msi` or `-setup.exe`                                                                         |
+| Linux x86_64                            | `Remi-*-linux-x86_64.deb` or `.AppImage` — X11 / XWayland recommended                                               |
+| macOS or Linux machine running an agent | `curl -fsSL .../releases/latest/download/install.sh \| sh -s -- --harness claude-code --check`                      |
+| Windows machine running an agent        | `install.ps1` from the same release — see [Agent hook setup](#agent-hook-setup)                                     |
 
 Nothing is code-signed yet, so macOS and Windows will warn on first launch. The release notes carry
 the exact incantations.
@@ -64,10 +65,10 @@ Native Wayland still leaves positioning, stacking and taskbar visibility to the 
 On KDE Plasma, add a window rule (System Settings → Window Management → Window Rules)
 matching Remi's window class:
 
-| property | setting |
-|---|---|
-| Position | Remember |
-| Keep above other windows | Apply initially · Yes |
+| property                        | setting               |
+| ------------------------------- | --------------------- |
+| Position                        | Remember              |
+| Keep above other windows        | Apply initially · Yes |
 | Skip taskbar / pager / switcher | Apply initially · Yes |
 
 The tray needs AppIndicator (`libayatana-appindicator3-1` on Debian/Ubuntu,
@@ -95,7 +96,7 @@ Replace `claude-code` with `codex` for Codex. From a source checkout, install an
 same way:
 
 ```sh
-cargo install --path crates/remi-hook --locked
+cargo install --path crates/remi-hook --locked --root ~/.local/bin
 ~/.cargo/bin/remi-hook setup --harness claude-code --check
 # or: ~/.cargo/bin/remi-hook setup --harness codex --check
 ```
@@ -107,6 +108,36 @@ trust the Remi hooks**, as required by
 [Codex's hook trust flow](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks).
 `check` verifies the file, not that trust decision. Desktop and IDE clients must load the same
 `CODEX_HOME` configuration.
+
+**On Windows**, PowerShell installs the same way. The execution policy blocks a downloaded
+script, so build it in memory instead of saving it — which is also what lets you pass it the
+arguments `irm | iex` cannot:
+
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod `
+  https://github.com/un-lock-able/remi-desktop/releases/latest/download/install.ps1))) `
+  --harness codex --check
+```
+
+It fetches `remi-hook-windows-x86_64.exe` — the only Windows build, which an ARM64 machine runs
+under emulation — verifies it against the release's `SHASUMS256.txt`, and installs it as
+`%USERPROFILE%\.local\bin\remi-hook.exe`. Everything after the script is forwarded to
+`remi-hook setup`, so `--harness` is required here too. `REMI_VERSION`, `REMI_HOOK_BIN`,
+`REMI_REPO` and `REMI_PREFIX` work as they do in `install.sh`.
+
+If you install by hand instead, keep the two rules the script keeps. Name the binary
+`remi-hook.exe` — setup recognises its own hooks by that file name, and a differently named
+copy makes `uninstall` a no-op and a second `setup` a duplicate. And put it somewhere
+**without a space in the path**, such as `%USERPROFILE%\.codex\bin`.
+
+Each Codex hook is written twice: `command`, quoted for a POSIX shell, and `commandWindows`,
+the same path unquoted. Codex runs the override on Windows through
+`cmd.exe /d /c "<command>"`, which loses a command whose first character is a quote, so an
+unquoted path is the only form that launches — and a path containing a space has no working
+form at all. The override is written on every
+platform, not only Windows, so one `CODEX_HOME` shared between machines says the same thing on
+each of them. Claude Code gets no such key: its settings schema rejects unknown keys in a hook
+entry, so its hooks remain broken on Windows for now.
 
 Run setup once per harness when both are installed. Check or remove one harness explicitly:
 
@@ -143,11 +174,11 @@ The state directory is keyed by `(harness, session)` and every record names its 
 machine can run two of them at once and Remi keeps them apart — the menu labels each session by
 which harness it came from.
 
-| harness | status |
-|---|---|
+| harness         | status                                                                                                                                 |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | **Claude Code** | supported. `remi-hook setup --harness claude-code` merges Remi's hooks into your `settings.json`, keeping your own hooks and a `.bak`. |
-| **OpenCode** | next. It gets a plugin rather than hooks; the event vocabulary is already the shared one. |
-| **Codex** | supported through lifecycle hooks: `remi-hook setup --harness codex --check`. See [Agent hook setup](#agent-hook-setup). |
+| **OpenCode**    | next. It gets a plugin rather than hooks; the event vocabulary is already the shared one.                                              |
+| **Codex**       | supported through lifecycle hooks: `remi-hook setup --harness codex --check`. See [Agent hook setup](#agent-hook-setup).               |
 
 Adding a harness should cost one file under `harness/` plus a config variant. If it ever costs
 more than that, the neutral vocabulary is wrong and wants fixing rather than working around.
@@ -188,7 +219,7 @@ The **code** is MIT — see `LICENSE`. Reuse it freely; MIT's one condition is t
 notice travels with it, so keep that in anything you build from this.
 
 The **character art** is not mine and is **not covered by that license**. The character is from
-[*Zenless Zone Zero*](https://zenless.hoyoverse.com/); the GIFs and the Spine skeleton are by
+[_Zenless Zone Zero_](https://zenless.hoyoverse.com/); the GIFs and the Spine skeleton are by
 [森哈_Yeah](https://space.bilibili.com/2021405481) on bilibili. It is **personal, non-commercial
 use only** — see `assets/README.md`. A fork that ships the art is redistributing someone else's
 work, not mine, and MIT does not carry that permission along with the code.

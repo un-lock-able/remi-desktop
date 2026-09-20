@@ -18,15 +18,20 @@ pub(super) struct Hook {
 
 impl Hook {
     /// This hook as it appears in the settings file, running `program`.
-    fn entry(&self, program: &str, harness: Harness) -> HookEntry {
+    fn entry(&self, program: &Program, harness: Harness) -> HookEntry {
+        let arguments = format!(
+            "signal {} --harness {}",
+            cli_word(&self.signal),
+            cli_word(&harness)
+        );
         HookEntry {
             event: self.event.to_owned(),
             matcher: self.matcher.map(str::to_owned),
-            command: format!(
-                "{program} signal {} --harness {}",
-                cli_word(&self.signal),
-                cli_word(&harness)
-            ),
+            command: format!("{} {arguments}", program.posix),
+            command_windows: program
+                .windows
+                .as_ref()
+                .map(|windows| format!("{windows} {arguments}")),
         }
     }
 }
@@ -37,6 +42,9 @@ pub struct HookEntry {
     pub event: String,
     pub matcher: Option<String>,
     pub command: String,
+    /// What the harness runs on Windows instead of `command`, for a harness that reads such an
+    /// override. `None` where the harness has no such key.
+    pub command_windows: Option<String>,
 }
 
 impl fmt::Display for HookEntry {
@@ -45,7 +53,11 @@ impl fmt::Display for HookEntry {
         if let Some(matcher) = &self.matcher {
             write!(f, " [{matcher}]")?;
         }
-        write!(f, ": {}", self.command)
+        write!(f, ": {}", self.command)?;
+        match &self.command_windows {
+            Some(windows) => write!(f, " (windows: {windows})"),
+            None => Ok(()),
+        }
     }
 }
 
@@ -70,7 +82,7 @@ pub fn install(
     harness: Harness,
     hooks: &[Hook],
 ) -> Result<Edit, Error> {
-    let program = program(hook_path)?;
+    let program = program(hook_path, harness)?;
     let before = read_settings(path)?;
     let mut settings = before.clone();
     let removed = remove_remi_hooks(&mut settings).map_err(|what| Error::shape(path, what))?;
@@ -108,7 +120,7 @@ pub fn inspect(
     harness: Harness,
     hooks: &[Hook],
 ) -> Result<Inspection, Error> {
-    let program = program(hook_path)?;
+    let program = program(hook_path, harness)?;
     let settings = read_settings(path)?;
     let found = remi_hooks(&settings).map_err(|what| Error::shape(path, what))?;
     let expected: Vec<HookEntry> = hooks
@@ -170,7 +182,7 @@ fn remove_remi_hooks(settings: &mut Value) -> Result<usize, String> {
 /// Appends one group per remi hook, running `program`. Returns how many hooks were added.
 fn add_hooks(
     settings: &mut Value,
-    program: &str,
+    program: &Program,
     harness: Harness,
     hooks: &[Hook],
 ) -> Result<usize, String> {
@@ -191,10 +203,16 @@ fn add_hooks(
         if let Some(matcher) = entry.matcher {
             group.insert("matcher".to_owned(), Value::String(matcher));
         }
-        group.insert(
-            "hooks".to_owned(),
-            json!([{ "type": "command", "command": entry.command, "timeout": hook.timeout }]),
-        );
+        // Built key by key rather than as one literal, so `commandWindows` can be left out
+        // entirely for a harness that has no such key.
+        let mut command = Map::new();
+        command.insert("type".to_owned(), Value::String("command".to_owned()));
+        command.insert("command".to_owned(), Value::String(entry.command));
+        if let Some(windows) = entry.command_windows {
+            command.insert("commandWindows".to_owned(), Value::String(windows));
+        }
+        command.insert("timeout".to_owned(), json!(hook.timeout));
+        group.insert("hooks".to_owned(), json!([Value::Object(command)]));
         groups.push(Value::Object(group));
     }
     Ok(hooks.len())
@@ -219,6 +237,10 @@ fn remi_hooks(settings: &Value) -> Result<Vec<HookEntry>, String> {
                     event: event.clone(),
                     matcher: matcher.map(str::to_owned),
                     command: entry["command"].as_str().unwrap_or_default().to_owned(),
+                    command_windows: entry
+                        .get("commandWindows")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
                 });
             }
         }
@@ -260,9 +282,20 @@ fn runs_remi_signal(command: &str) -> bool {
     named_remi_hook && rest.split_whitespace().next() == Some("signal")
 }
 
-/// `hook_path` as the first word of a shell command: as it is when every character is safe,
-/// otherwise in single quotes.
-fn program(hook_path: &Path) -> Result<String, Error> {
+/// How a hook command names `remi-hook`, in each spelling the harness may run.
+struct Program {
+    /// The first word of a POSIX shell command: as it is when every character is safe,
+    /// otherwise in single quotes.
+    posix: String,
+    /// The same path for a harness that takes a Windows-only override, written plain. Codex
+    /// runs a hook as `cmd.exe /d /c "<command>"`, and a command line whose first character is
+    /// a quote loses its program token to cmd's quote stripping, so the single-quoted `posix`
+    /// spelling never launches there. `None` for a harness with no such key.
+    windows: Option<String>,
+}
+
+/// `hook_path` as each harness spells it in a hook command.
+fn program(hook_path: &Path, harness: Harness) -> Result<Program, Error> {
     let path = hook_path
         .to_str()
         .ok_or_else(|| Error::PathNotUtf8(hook_path.to_owned()))?;
@@ -270,11 +303,22 @@ fn program(hook_path: &Path) -> Result<String, Error> {
         && path
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || b"/._-+:@%,".contains(&byte));
-    Ok(if plain {
+    let posix = if plain {
         path.to_owned()
     } else {
         format!("'{}'", path.replace('\'', r"'\''"))
-    })
+    };
+    // Written on every platform, not only Windows: one machine's settings file then says the
+    // same thing as another's, so a `$CODEX_HOME` shared between them — a dotfiles repository,
+    // a synced home — doesn't have each machine reporting the other's hooks as unexpected.
+    let windows = match harness {
+        Harness::Codex => Some(path.to_owned()),
+        // Claude Code validates its settings against a schema that forbids unknown keys in a
+        // hook entry, and a file that fails it stops Claude Code with a dialog at session
+        // start. OpenCode is configured by plugin, not by this editor.
+        Harness::ClaudeCode | Harness::OpenCode => None,
+    };
+    Ok(Program { posix, windows })
 }
 
 /// How `value` is spelled on the command line, so a hook command always names an event the
@@ -293,10 +337,15 @@ mod tests {
     use crate::setup::claude::{HOOKS, inspect, install};
 
     fn add_hooks(settings: &mut Value, program: &str) -> Result<usize, String> {
-        super::add_hooks(settings, program, Harness::ClaudeCode, HOOKS)
+        let program = super::program(Path::new(program), Harness::ClaudeCode).unwrap();
+        super::add_hooks(settings, &program, Harness::ClaudeCode, HOOKS)
     }
 
     const PROGRAM: &str = "/usr/local/bin/remi-hook";
+
+    fn claude_program() -> Program {
+        program(Path::new(PROGRAM), Harness::ClaudeCode).unwrap()
+    }
 
     fn commands(settings: &Value) -> Vec<String> {
         remi_hooks(settings)
@@ -332,7 +381,7 @@ mod tests {
 
     #[test]
     fn quotes_a_program_path_only_when_it_needs_it() {
-        let quoted = |path: &str| program(Path::new(path)).unwrap();
+        let quoted = |path: &str| program(Path::new(path), Harness::ClaudeCode).unwrap().posix;
         assert_eq!(
             quoted("/home/u/.local/bin/remi-hook"),
             "/home/u/.local/bin/remi-hook"
@@ -344,6 +393,40 @@ mod tests {
         assert_eq!(quoted("/it's/remi-hook"), r"'/it'\''s/remi-hook'");
     }
 
+    /// Codex runs the override through `cmd.exe /c`, which loses a command that starts with a
+    /// quote, so the Windows spelling stays plain however the POSIX one is quoted.
+    #[test]
+    fn only_codex_gets_a_windows_spelling_and_it_is_never_quoted() {
+        let windows = |path: &str, harness| program(Path::new(path), harness).unwrap().windows;
+        let path = r"C:\Users\u\.codex\bin\remi-hook.exe";
+        assert_eq!(windows(path, Harness::Codex).as_deref(), Some(path));
+        assert_eq!(windows(path, Harness::ClaudeCode), None);
+        assert_eq!(windows(path, Harness::OpenCode), None);
+        // The POSIX spelling of the same path is quoted, and so unusable on Windows.
+        assert!(
+            program(Path::new(path), Harness::Codex)
+                .unwrap()
+                .posix
+                .starts_with('\'')
+        );
+    }
+
+    /// Claude Code's settings schema forbids unknown keys in a hook entry.
+    #[test]
+    fn claude_code_entries_carry_no_windows_key() {
+        let mut settings = json!({});
+        add_hooks(&mut settings, PROGRAM).unwrap();
+
+        let entry = &settings["hooks"]["Stop"][0]["hooks"][0];
+        assert!(entry.get("commandWindows").is_none(), "{entry}");
+        assert!(
+            remi_hooks(&settings)
+                .unwrap()
+                .iter()
+                .all(|hook| hook.command_windows.is_none())
+        );
+    }
+
     #[test]
     fn writes_every_hook_into_an_empty_file_in_order() {
         let mut settings = json!({});
@@ -353,7 +436,7 @@ mod tests {
 
         let expected: Vec<HookEntry> = HOOKS
             .iter()
-            .map(|hook| hook.entry(PROGRAM, Harness::ClaudeCode))
+            .map(|hook| hook.entry(&claude_program(), Harness::ClaudeCode))
             .collect();
         assert_eq!(remi_hooks(&settings).unwrap(), expected);
         assert_eq!(

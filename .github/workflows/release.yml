@@ -176,17 +176,18 @@ jobs:
           path: staging
           merge-multiple: true
 
-      # `install.sh` is a release asset, not just a file in the repo: it is fetched by
-      # `latest/download/install.sh`, so the copy a user pipes to sh is always the one that
-      # matches the binaries beside it.
+      # The installers are release assets, not just files in the repo: each is fetched by
+      # `latest/download/<name>`, so the copy a user pipes to a shell is always the one that
+      # matches the binaries beside it. `install.ps1` is the Windows one; it resolves the same
+      # asset names and the same SHASUMS256.txt.
       - name: assemble
         run: |
           mkdir -p dist
           mv staging/* dist/
-          cp install.sh dist/
+          cp install.sh install.ps1 dist/
           cd dist
-          # The names here are the contract `install.sh` resolves to. Changing one silently
-          # breaks every `curl | sh` against the release.
+          # The names here are the contract both installers resolve to. Changing one
+          # silently breaks every install against the release.
           #
           # Written outside the directory and moved in, so the sums file can never end up
           # listing (a partially written) itself.
