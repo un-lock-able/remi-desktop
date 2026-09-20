@@ -13,6 +13,25 @@ The session can be on this machine or on any host you already `ssh` to, and she 
 the right thing **while you are detached from it** — which is the entire point. A hook on the
 remote writes a state file; nothing has to stay connected for the state to stay true.
 
+## States
+
+One session, eight states — seven poses, since Writing and Replying share one. Remi holds
+whichever state that session is in until an event moves her out of it.
+
+| | state | when she shows it |
+|---|---|---|
+| <img src="assets/preview/thinking.gif" width="110"> | **Thinking** | The agent is working out what to do next — between the prompt and the first tool call, or between tool calls. |
+| <img src="assets/preview/viewing.gif" width="110"> | **Viewing** | Reading: a file read, a search, a listing. Pen in hand, on task. |
+| <img src="assets/preview/writing.gif" width="110"> | **Writing** · **Replying** | Changing files — an edit, a write, a patch — or putting words on your screen. Two states, deliberately one pose: a separate one would be a distinction without a difference. |
+| <img src="assets/preview/waiting-for-input.gif" width="110"> | **Waiting for input** | **Blocked on you** — a permission prompt, or a question. The state the whole pet exists for: she sits there waiting and you notice without watching the terminal. |
+| <img src="assets/preview/proud.gif" width="110"> | **Proud** | The turn just landed. Fades to Idle after a few seconds. |
+| <img src="assets/preview/idle.gif" width="110"> | **Idle** | Between turns: what Proud fades into, or a turn you interrupted. Empty-handed rest. |
+| <img src="assets/preview/offline.gif" width="110"> | **Offline** | No session — it ended, or the host went away. The same rest as Idle, greyed and dimmed so it reads as "nothing running" from across the room. |
+
+The previews are the GIF art, downscaled. The app renders the Spine skeleton, which is the same
+poses drawn by [森哈_Yeah](https://space.bilibili.com/2021405481) as a rig rather than as frames —
+smoother, sharper, and it crossfades between states instead of cutting.
+
 ## Install
 
 Grab the latest release. In short:
