@@ -56,7 +56,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install stable --profile minimal
-      - run: cargo install cross --locked
+      # A prebuilt cross, rather than `cargo install cross`, which spends half this job
+      # compiling from source a binary that is identical every time.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cross
       - run: cross build --release --locked -p remi-hook --target ${{ matrix.target }}
       # `file`, not `ldd`: ldd cannot read a foreign-architecture binary, and half this matrix
       # is foreign to the runner.
