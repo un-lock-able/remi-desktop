@@ -2,13 +2,11 @@ Remi is a desktop pet that shows what your coding agent is doing — on this mac
 
 Remi is harness-neutral by design: adapters report neutral events and one reducer turns those into poses. **Claude Code and Codex have hook adapters**; OpenCode is next.
 
-## Since beta.2
+## Since beta.3
 
-- Remi has a **menu bar icon** now, carrying the same session menu as her right-click — so she is reachable when she is behind a window, or hidden (35c4569)
-- **Hide Remi / Show Remi** in that menu puts her away and brings her back, and the row flips on the click that did it (35c4569, 7da2d3b)
-- The icon is a template glyph on macOS, tinted by the bar; on Windows and Linux it is the coloured ornament, which reads on a dark panel (bf7f8ce)
-- **macOS: she stays visible over full-screen apps** and on every Space, without stealing focus when you click her (eff4f6a)
-- The README now explains how to run her on Linux under KDE Plasma (ace94d3)
+- **Codex is a supported harness.** `remi-hook setup --harness codex` writes its lifecycle hooks, leaving your `config.toml`, other hooks and `notify` intact — Remi reads a Codex session the way she reads a Claude Code one (a4875f2, 2cef8c8, b50da2c, 0aea31d)
+- **Linux has release builds** — `.deb` and `.AppImage` for x86_64, plus a `-gif-fallback` package for machines where WebKitGTK cannot composite the Spine canvas (a4875f2, 73c17cd)
+- **`--harness` no longer defaults to Claude Code** — name `claude-code` or `codex`. If you pipe `install.sh` into `sh` with no arguments, it now installs the binary and configures *nothing*, saying so, rather than guessing which agent the machine runs (e5f97ba)
 
 ## Install the pet
 
