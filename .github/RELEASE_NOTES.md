@@ -2,11 +2,12 @@ Remi is a desktop pet that shows what your coding agent is doing — on this mac
 
 Remi is harness-neutral by design: adapters report neutral events and one reducer turns those into poses. **Claude Code and Codex have hook adapters**; OpenCode is next.
 
-## Since beta.3
+## Since beta.4
 
-- **Codex is a supported harness.** `remi-hook setup --harness codex` writes its lifecycle hooks, leaving your `config.toml`, other hooks and `notify` intact — Remi reads a Codex session the way she reads a Claude Code one (a4875f2, 2cef8c8, b50da2c, 0aea31d)
-- **Linux has release builds** — `.deb` and `.AppImage` for x86_64, plus a `-gif-fallback` package for machines where WebKitGTK cannot composite the Spine canvas (a4875f2, 73c17cd)
-- **`--harness` no longer defaults to Claude Code** — name `claude-code` or `codex`. If you pipe `install.sh` into `sh` with no arguments, it now installs the binary and configures *nothing*, saying so, rather than guessing which agent the machine runs (e5f97ba)
+- **A Windows machine running an agent can be set up from PowerShell.** `install.ps1` ships beside the binaries and resolves the same asset names and the same `SHASUMS256.txt` as `install.sh` — see below for the incantation that gets arguments past the execution policy (dbb81f6)
+- **Codex hooks launch on Windows.** Each hook is now written twice: `command` for a POSIX shell, and `commandWindows`, the same path unquoted. Codex runs the override through `cmd.exe /d /c "<command>"`, which loses a command whose first character is a quote, so the quoted POSIX spelling never started there. The override is written on every platform, so one `CODEX_HOME` shared between machines says the same thing on each (dbb81f6)
+- Hooks an earlier Remi wrote, without that override, are still recognised as hers — `check` reports them and `uninstall` takes them out — but no longer match what `setup` writes, so `check` sends you to run `setup` again (dbb81f6)
+- The README now shows **what each of the seven poses looks like** (3412a23)
 
 ## Install the pet
 
@@ -50,6 +51,23 @@ Check with `remi-hook check --harness codex`; remove with `remi-hook uninstall -
 Use a Codex runtime with lifecycle-hook support. Reply streaming and arbitrary shell-command
 classification are not available through this adapter.
 
+**On Windows**, PowerShell installs the same binary. The execution policy blocks a downloaded
+script, so build it in memory rather than saving it — which is also what lets you pass it the
+arguments `irm | iex` cannot:
+
+```powershell
+& ([scriptblock]::Create((Invoke-RestMethod `
+  https://github.com/un-lock-able/remi-desktop/releases/latest/download/install.ps1))) `
+  --harness codex --check
+```
+
+Everything after the script is forwarded to `remi-hook setup`, so `--harness` is required here
+too. It installs `%USERPROFILE%\.local\bin\remi-hook.exe`, fetching
+`remi-hook-windows-x86_64.exe` — the only Windows build, which an ARM64 machine runs under
+emulation. If you install by hand instead, keep the binary named `remi-hook.exe`, which is how
+setup recognises its own hooks, and put it somewhere **without a space in the path**: on
+Windows a Codex hook command has no working form for a path containing one.
+
 To undo Claude Code setup: `remi-hook uninstall --harness claude-code`. `--purge` is not implemented.
 
 ## Known limits in this beta
@@ -57,6 +75,7 @@ To undo Claude Code setup: `remi-hook uninstall --harness claude-code`. `--purge
 - **Nothing is code-signed.** See the quarantine and SmartScreen notes above.
 - **The pet does not install the hook for you.** Even for your own machine, run the script above.
 - **No autostart.** Add Remi to your login items yourself.
+- **Claude Code hooks do not run on Windows.** Its settings schema rejects unknown keys in a hook entry, so Remi cannot write the `commandWindows` override there; a file that fails that schema stops Claude Code with a dialog at session start. Codex is the harness to use on a Windows agent machine for now.
 - **OpenCode is not implemented.** `--harness opencode` is accepted by the CLI but its plugin is not written yet.
 
 ## Credits
