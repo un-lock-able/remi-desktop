@@ -52,7 +52,7 @@ fn main() {
     // restore its position and request always-on-top. Fall back to native Wayland;
     // an explicit GDK_BACKEND remains authoritative.
     #[cfg(target_os = "linux")]
-    gdk::set_allowed_backends("x11,wayland");
+    gdk::set_allowed_backends("wayland,x11");
 
     // `RUST_LOG=remi_desktop=debug,remi_core=debug` turns on the per-change state lines.
     tracing_subscriber::fmt()
