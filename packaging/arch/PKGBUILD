@@ -1,0 +1,95 @@
+# Maintainer: un-lock-able <gaogao174561@outlook.com>
+#
+# The pet only. `remi-hook` is installed per agent machine by `install.sh`, which also writes
+# the harness settings — pacman has nothing to configure there, so it stays out of here.
+#
+# To build work that is committed locally but not pushed, point `source` at the clone:
+#   source=("git+file:///home/gaoyx/repos/remi-desktop#branch=main")
+# Either way makepkg builds the checked-out commit, never the dirty working tree — and keep
+# the `#branch=main`, which is what a local clone needs most: without it makepkg takes that
+# repo's current HEAD, which on this branch would be the packaging commit itself.
+
+pkgname=remi-desktop-git
+pkgver=0.1.4.beta.5.r2.gf4d03c6
+pkgrel=1
+pkgdesc="A desktop pet that shows what your coding agent is doing"
+arch=('x86_64' 'aarch64')
+url="https://github.com/un-lock-able/remi-desktop"
+# MIT covers the code. It does *not* cover the character art under `assets/`, which is a
+# third party's work and is embedded in this binary — see `assets/README.md` in the source.
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'hicolor-icon-theme')
+makedepends=('git' 'cargo' 'pkgconf')
+optdepends=('xorg-xwayland: position restoration and always-on-top in a Wayland session')
+provides=('remi-desktop')
+conflicts=('remi-desktop')
+source=("$pkgname::git+https://github.com/un-lock-able/remi-desktop.git#branch=main")
+sha256sums=('SKIP')
+
+# Describes main's tip, since that is what `source` checks out: the r-count and hash are main's,
+# and this branch's packaging commit never enters them.
+#
+# Tags carry a pre-release suffix (`v0.1.4-beta.5`), which pkgver may not: every `-` becomes a
+# `.`, and the commit count is prefixed with `r` so untagged commits sort above the tag they
+# follow. v0.1.4-beta.5, 12 commits on → 0.1.4.beta.5.r12.gabc1234.
+#
+# One wrinkle worth knowing rather than working around: a pre-release sorts *above* the plain
+# version it precedes, so 0.1.4.beta.5 reads as newer than a later 0.1.4. Any real next release
+# (0.1.5, 0.2.0) sorts correctly, which is the case that actually happens.
+pkgver() {
+  cd "$srcdir/$pkgname"
+  git describe --long --tags --abbrev=7 | sed 's/^v//;s/\([^-]*-g\)/r\1/;s/-/./g'
+}
+
+prepare() {
+  cd "$srcdir/$pkgname"
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"
+}
+
+build() {
+  cd "$srcdir/$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  # `gif-fallback` on, unlike upstream's default: WebKitGTK is exactly the webview that does
+  # not always composite the transparent WebGL canvas the Spine renderer draws into, and that
+  # failure is an invisible pet. It costs 8.5 MiB of embedded art. Drop the flag to build her
+  # Spine-only, as macOS and Windows ship her.
+  cargo build --frozen --release -p remi-desktop --features gif-fallback
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+
+  # The cargo binary, not a Tauri bundle: `frontendDist` is embedded at build time, so this
+  # one file is the whole pet. It also means no cargo-tauri, no patchelf, no librsvg here.
+  install -Dm755 target/release/remi-desktop "$pkgdir/usr/bin/remi-desktop"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+
+  local icons="crates/remi-desktop/icons"
+  install -Dm644 "$icons/32x32.png" \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/remi-desktop.png"
+  install -Dm644 "$icons/128x128.png" \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/remi-desktop.png"
+  # 128x128@2x is a 256x256 image; hicolor names directories by pixels, not by scale.
+  install -Dm644 "$icons/128x128@2x.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/remi-desktop.png"
+  install -Dm644 "$icons/icon.png" \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/remi-desktop.png"
+
+  # Written here rather than kept as a source file, so this PKGBUILD stands alone: it can be
+  # copied to the Arch box by itself and needs nothing from the repo it clones.
+  #
+  # StartupWMClass is the name GTK reports as WM_CLASS, which is the binary's name. Confirm it
+  # with `xprop WM_CLASS` while she is running if the taskbar refuses to group her.
+  install -Dm644 /dev/stdin "$pkgdir/usr/share/applications/remi-desktop.desktop" <<'DESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Remi
+Comment=A desktop pet that shows what your coding agent is doing
+Exec=remi-desktop
+Icon=remi-desktop
+Terminal=false
+Categories=Utility;
+StartupWMClass=remi-desktop
+DESKTOP
+}
