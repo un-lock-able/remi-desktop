@@ -72,7 +72,7 @@ matching Remi's window class:
 | Skip taskbar / pager / switcher | Apply initially · Yes |
 
 The tray needs AppIndicator (`libayatana-appindicator3-1` on Debian/Ubuntu,
-`libappindicator-gtk3` on Arch). KDE Plasma shows it natively; GNOME needs its AppIndicator
+`libayatana-appindicator` on Arch). KDE Plasma shows it natively; GNOME needs its AppIndicator
 extension. Right-clicking the pet also opens the menu.
 
 `Remi-*-linux-x86_64.deb` and `.AppImage` are the pet as macOS and Windows ship her: Spine only.
@@ -193,10 +193,10 @@ packages. On Debian/Ubuntu:
 
 ```sh
 sudo apt install build-essential pkg-config libwebkit2gtk-4.1-dev \
-  libayatana-appindicator3-dev librsvg2-dev patchelf libxdo-dev
+  libayatana-appindicator3-dev librsvg2-dev patchelf
 ```
 
-On Arch: `sudo pacman -S --needed base-devel rust pkgconf webkit2gtk-4.1 libappindicator-gtk3 librsvg patchelf`.
+On Arch: `sudo pacman -S --needed base-devel rust pkgconf webkit2gtk-4.1 libayatana-appindicator librsvg patchelf`.
 
 ```sh
 cargo test --workspace          # all three crates
