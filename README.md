@@ -48,7 +48,9 @@ Nothing is code-signed yet, so macOS and Windows will warn on first launch. The 
 the exact incantations.
 
 Remi has **no Dock icon**. Use the tray icon or right-click her for the session menu — pick a
-session, connect to a host, resize, hide, quit.
+session, connect to a host, resize, hide, quit. With the menu open, the underlined letter picks a
+row on Windows and Linux (<kbd>H</kbd> hides her, <kbd>F</kbd> goes back to following the newest
+session); on macOS, type the start of a row's name and press <kbd>Return</kbd>.
 
 ### Linux
 

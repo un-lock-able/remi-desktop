@@ -169,21 +169,23 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     // a tick on a session row means that session is pinned.
     let follow_text = match (&selection, &current) {
         (Selection::Auto, Some(entry)) => format!(
-            "Follow most recent — {} · {}",
-            entry.key.connection,
-            cut(&entry.label, NAME_MAX)
+            "&Follow most recent — {} · {}",
+            literal(entry.key.connection.as_str()),
+            literal(&cut(&entry.label, NAME_MAX))
         ),
-        _ => "Follow most recent".to_owned(),
+        _ => "&Follow most recent".to_owned(),
     };
     let follow = CheckMenuItemBuilder::with_id(FOLLOW, follow_text)
         .checked(selection == Selection::Auto)
         .build(app)?;
 
-    let mut sizes = SubmenuBuilder::new(app, "Size");
+    // Not `&Size`: Show Remi has S, and both are on screen together in the tray while she is
+    // hidden.
+    let mut sizes = SubmenuBuilder::new(app, "Si&ze");
     for (named, text) in [
-        (NamedSize::Small, "Small"),
-        (NamedSize::Medium, "Medium"),
-        (NamedSize::Large, "Large"),
+        (NamedSize::Small, "&Small"),
+        (NamedSize::Medium, "&Medium"),
+        (NamedSize::Large, "&Large"),
     ] {
         // A hand-written pixel count in the config is not one of these three, so none is ticked —
         // which is the truth, and picking one from here is how the user goes back to a named size.
@@ -199,16 +201,17 @@ pub fn build(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     // second click to flip. When she is hidden this is the tray's row alone — there is no pet
     // left to right-click.
     let (visibility, visibility_text) = if hidden {
-        (SHOW, "Show Remi")
+        (SHOW, "&Show Remi")
     } else {
-        (HIDE, "Hide Remi")
+        (HIDE, "&Hide Remi")
     };
 
     // ⚠️ The separator before Quit is a hit target, not decoration. Quit is unusually expensive
     // here — `LSUIElement` means no Dock icon and no Cmd-Tab entry, so quitting by accident ends
     // the app with nothing left on screen to say so — while its neighbour, Hide, costs one click
     // to undo. macOS gives a separator real height, so this buys the row above it a margin that
-    // belongs to neither item.
+    // belongs to neither item. It is also why Quit is the one row with no mnemonic: a stray letter
+    // typed into an open menu should not be able to end the app.
     menu.separator()
         .item(&follow)
         .separator()
@@ -235,7 +238,7 @@ fn is_watched(connection: &ConnectionMenu) -> bool {
 /// otherwise invisible: a `~/.ssh/config` with nothing in it and one the pet never read look
 /// identical from a menu that simply omits the row.
 fn hosts(app: &AppHandle, offered: &[&ConnectionMenu]) -> tauri::Result<Submenu<Wry>> {
-    let mut submenu = SubmenuBuilder::new(app, "Connect to a host…");
+    let mut submenu = SubmenuBuilder::new(app, "&Connect to a host…");
     if offered.is_empty() {
         let text = "No other hosts in ~/.ssh/config";
         return submenu
@@ -645,6 +648,13 @@ pub fn settled(snapshot: &MenuSnapshot) -> MenuSnapshot {
     settled
 }
 
+/// Text from outside the app — a host name, a session title — made safe to put in a label that
+/// has a mnemonic. An `&` marks the next letter as the row's key on Windows and Linux (and is
+/// dropped on macOS), so a title like "R&D notes" would otherwise take `D` from the row it sits in.
+fn literal(text: &str) -> String {
+    text.replace('&', "&&")
+}
+
 /// Truncates on a character boundary, since titles and ssh errors are both arbitrary UTF-8.
 fn cut(text: &str, max: usize) -> String {
     if text.chars().count() <= max {
@@ -656,6 +666,12 @@ fn cut(text: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_ampersand_in_a_title_stays_text() {
+        assert_eq!(literal("R&D notes"), "R&&D notes");
+        assert_eq!(literal("plain"), "plain");
+    }
 
     fn key(connection: &str, harness: &str, session: &str) -> SessionKey {
         SessionKey {
