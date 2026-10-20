@@ -131,7 +131,8 @@ enum SignalEvent {
     /// The user answered an approval prompt, before the tool it guarded runs. Remi returns
     /// to the pose held before the prompt. For harnesses that report the answer directly.
     ApprovalAnswered,
-    /// The agent finished its turn. Remi: proud, fading to idle.
+    /// The agent finished its turn. Remi: proud, fading to idle — or, if a tool call in the
+    /// turn left work running in the background, background until the agent's next turn.
     TurnEnd,
     /// The user interrupted the turn. Remi rests until work resumes.
     TurnInterrupted,
@@ -339,6 +340,7 @@ fn signal(args: SignalArgs, env: &Env) -> Result<(), Error> {
         ts: env.now,
         cwd: input.cwd.or_else(|| env.cwd_name.clone()),
         title: args.title,
+        launched_background: input.launched_background,
     };
 
     let update = signal.next_update(previous.as_ref(), context);

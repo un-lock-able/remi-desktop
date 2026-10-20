@@ -33,7 +33,8 @@ pub enum Signal {
     /// that report the answer send this; on the others the following [`Signal::ToolEnd`]
     /// is what clears the prompt.
     ApprovalAnswered,
-    /// The agent finished its turn.
+    /// The agent finished its turn. If a tool call in the turn left work running in the
+    /// background, the record says so.
     TurnEnd,
     /// The user interrupted the turn; the session remains available.
     TurnInterrupted,
@@ -52,6 +53,8 @@ impl Signal {
     pub fn next_update(self, previous: Option<&SessionRecord>, context: SessionContext) -> Update {
         let current = previous.map(|record| record.state);
         let resume = previous.and_then(|record| record.resume);
+        let launched =
+            previous.is_some_and(|record| record.launched) || context.launched_background;
 
         // The pose this signal moves the session to, and the pose to return to once an
         // outstanding approval prompt is answered. Every signal except a prompt clears the
@@ -100,6 +103,21 @@ impl Signal {
             context.ts,
         );
         record.resume = resume;
+        // Whether the turn left work running in the background. `launched` remembers, from one
+        // signal to the next, that some tool call in the current turn started background work; the
+        // turn's end moves it into `background`, the field the pet reads, and a new or interrupted
+        // turn drops it.
+        //
+        // No harness reports background work finishing, and this doesn't need it to. A harness
+        // that runs work in the background starts a new turn to report the result, and that turn
+        // launched nothing, so its end writes a record without `background`. The cost is that only
+        // the launching turn says so: if the user starts another turn while the work is still
+        // running, that turn ends without `background` too.
+        match self {
+            Signal::TurnEnd => record.background = launched,
+            Signal::TurnStart | Signal::TurnInterrupted => {}
+            _ => record.launched = launched,
+        }
         record.cwd = context.cwd;
         if context.title.is_some() {
             record.title = context.title;
@@ -137,6 +155,8 @@ pub struct SessionContext {
     /// The session's title, if the harness reported one this time. When `None`, a title
     /// already in the previous record is kept.
     pub title: Option<String>,
+    /// The tool call this signal reports on left work running in the background.
+    pub launched_background: bool,
 }
 
 #[cfg(test)]
@@ -154,6 +174,7 @@ mod tests {
             ts,
             cwd: Some("remi-desktop".into()),
             title: None,
+            launched_background: false,
         }
     }
 
@@ -388,5 +409,94 @@ mod tests {
             ReadStart.next_update(Some(&previous), context(T0 - 5)),
             Update::Write(_)
         ));
+    }
+
+    /// Like [`poses`], but each signal says whether its tool call left work in the background,
+    /// and each step reports the pose with whether the record says background work is running.
+    fn turns(signals: &[(Signal, bool)]) -> Vec<(PetState, bool)> {
+        let mut current: Option<SessionRecord> = None;
+        let mut seen = Vec::new();
+        for (i, &(signal, launched)) in signals.iter().enumerate() {
+            let mut context = context(T0 + i as i64);
+            context.launched_background = launched;
+            match signal.next_update(current.as_ref(), context) {
+                Update::Write(record) => current = Some(record),
+                Update::Skip => {}
+                Update::Remove { .. } => current = None,
+            }
+            seen.push(
+                current
+                    .as_ref()
+                    .map_or((Offline, false), |record| (record.state, record.background)),
+            );
+        }
+        seen
+    }
+
+    #[test]
+    fn a_turn_that_launches_background_work_ends_with_it_running() {
+        assert_eq!(
+            turns(&[
+                (TurnStart, false),
+                (ToolEnd, true),
+                (ReadStart, false),
+                (ToolEnd, false),
+                (TurnEnd, false),
+            ]),
+            [
+                (Thinking, false),
+                (Thinking, false),
+                (Viewing, false),
+                (Thinking, false),
+                (Proud, true),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_turn_that_reports_the_work_finished_ends_as_usual() {
+        // The harness wakes the agent with the outcome; whether that turn opens with a
+        // `TurnStart` or goes straight to its tools, it launched nothing.
+        let launch = [(TurnStart, false), (ToolEnd, true), (TurnEnd, false)];
+        for wake in [
+            &[(TurnStart, false), (TurnEnd, false)][..],
+            &[(ReadStart, false), (ToolEnd, false), (TurnEnd, false)],
+        ] {
+            let seen = turns(&[&launch[..], wake].concat());
+            assert_eq!(seen[2], (Proud, true));
+            assert_eq!(seen.last(), Some(&(Proud, false)), "{wake:?}");
+        }
+    }
+
+    #[test]
+    fn a_turn_without_a_launch_ends_as_usual() {
+        assert_eq!(
+            turns(&[(TurnStart, false), (ToolEnd, false), (TurnEnd, false)]),
+            [(Thinking, false), (Thinking, false), (Proud, false)]
+        );
+    }
+
+    #[test]
+    fn a_launch_is_forgotten_when_the_turn_is_cut_short() {
+        for cut in [TurnStart, TurnInterrupted] {
+            let seen = turns(&[
+                (TurnStart, false),
+                (ToolEnd, true),
+                (cut, false),
+                (TurnEnd, false),
+            ]);
+            assert_eq!(seen.last(), Some(&(Proud, false)), "{cut:?}");
+        }
+    }
+
+    #[test]
+    fn whatever_follows_the_turn_clears_the_background_flag() {
+        let seen = turns(&[
+            (TurnStart, false),
+            (ToolEnd, true),
+            (TurnEnd, false),
+            (ReadStart, false),
+        ]);
+        assert_eq!(seen.last(), Some(&(Viewing, false)));
     }
 }

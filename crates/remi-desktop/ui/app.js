@@ -13,6 +13,7 @@ const STATES = [
   "replying",
   "waiting_for_input",
   "proud",
+  "background",
   "offline",
 ];
 

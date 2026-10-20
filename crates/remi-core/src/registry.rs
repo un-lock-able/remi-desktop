@@ -343,6 +343,12 @@ impl StoredSession {
         let last_heard = now.saturating_duration_since(self.received);
         let pose = match self.record.state {
             _ if self.ended.is_some() => PetState::Offline,
+            // The turn ended with work still running in the background: show `Background` at
+            // once, in place of `Proud`, and hold it until the session writes again — which it
+            // does when the harness starts a turn to report the work's result. Not timed, and
+            // shown for a record found on attach too: unlike `Proud`, it says something is
+            // still true, not that something just happened.
+            PetState::Proud if self.record.background => PetState::Background,
             // A turn that ended before the pet was looking is simply over: showing `Proud` would
             // be congratulating Claude for work it finished hours ago.
             PetState::Proud if !self.witnessed || last_heard >= PROUD_FADES_AFTER => PetState::Idle,
@@ -500,6 +506,24 @@ mod tests {
         let just_before = t0 + PROUD_FADES_AFTER - Duration::from_millis(1);
         assert_eq!(shown(&registry, just_before).unwrap().1, Proud);
         assert_eq!(shown(&registry, t0 + PROUD_FADES_AFTER).unwrap().1, Idle);
+    }
+
+    #[test]
+    fn a_turn_that_left_background_work_shows_it_at_once_and_holds_it() {
+        let mut registry = Registry::default();
+        let t0 = Instant::now();
+        connect(&mut registry, "local", t0);
+        let mut ended = record("claude-code", "s1", Proud, 100);
+        ended.background = true;
+        upsert(&mut registry, "local", ended.clone(), t0);
+
+        assert_eq!(shown(&registry, t0).unwrap().1, Background);
+        let much_later = t0 + PROUD_FADES_AFTER * 100;
+        assert_eq!(shown(&registry, much_later).unwrap().1, Background);
+
+        let mut found = Registry::default();
+        snapshot(&mut found, "local", vec![ended], t0);
+        assert_eq!(shown(&found, t0).unwrap().1, Background);
     }
 
     #[test]

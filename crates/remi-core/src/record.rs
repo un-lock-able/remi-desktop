@@ -31,9 +31,16 @@ pub struct SessionRecord {
     /// `ts` of the first record written for this session.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub started: Option<i64>,
+    /// The turn that just ended left work running in the background. Set only on the record a
+    /// turn's end writes; whatever the session does next writes a record without it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub background: bool,
     /// Writer-private: the pose to return to once an approval prompt clears.
     #[serde(rename = "_resume", default, skip_serializing_if = "Option::is_none")]
     pub resume: Option<PetState>,
+    /// Writer-private: the current turn has started work in the background.
+    #[serde(rename = "_launched", default, skip_serializing_if = "std::ops::Not::not")]
+    pub launched: bool,
 }
 
 impl SessionRecord {
@@ -48,7 +55,9 @@ impl SessionRecord {
             title: None,
             cwd: None,
             started: None,
+            background: false,
             resume: None,
+            launched: false,
         }
     }
 
@@ -217,7 +226,9 @@ mod tests {
             title: Some("Creating bin from crate libs".into()),
             cwd: Some("remi-desktop".into()),
             started: Some(1_757_150_100),
+            background: true,
             resume: Some(PetState::Writing),
+            launched: true,
         }
     }
 
@@ -232,6 +243,8 @@ mod tests {
         let json = String::from_utf8(full_record().to_json()).unwrap();
         assert!(json.contains(r#""state":"waiting_for_input""#), "{json}");
         assert!(json.contains(r#""_resume":"writing""#), "{json}");
+        assert!(json.contains(r#""background":true"#), "{json}");
+        assert!(json.contains(r#""_launched":true"#), "{json}");
     }
 
     #[test]
@@ -299,7 +312,9 @@ mod tests {
         assert_eq!(record.state, PetState::Proud);
         assert_eq!(record.ts, 1_757_150_999);
         assert_eq!(record.cwd, None);
+        assert!(!record.background);
         assert_eq!(record.resume, None);
+        assert!(!record.launched);
     }
 
     #[test]

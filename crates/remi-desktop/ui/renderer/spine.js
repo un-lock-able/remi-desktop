@@ -3,22 +3,30 @@
 // `spine` is a global, defined by ./vendor/spine-webgl.js, which index.html loads as a classic
 // script ahead of the module graph — so there is no bundler and no node in the build.
 
-// Animation names are the asset's own. `light` is a flavour variant and `0` is the empty setup
-// pose — neither is ever played.
+// Animation names are the asset's own. `d_win` is a transition and `0` is the empty setup pose —
+// neither is ever played. Each state lists the animations it plays, one per track from 0 up, so
+// the first is underneath.
 const ANIMATION = {
   // `a_win` is the pen pick-up and `a` is the empty-handed rest. `a_win` loops like being patted
   // on the head, which is tolerable in a pose that flashes past during a read and wrong in the one
   // Remi holds whenever nothing is happening — hence this way round, which also reads better:
   // pen in hand while on task, empty-handed at rest.
-  viewing: "a_win",
-  idle: "a",
-  thinking: "b",
-  proud: "c",
-  writing: "d",
+  viewing: ["a_win"],
+  idle: ["a"],
+  thinking: ["b"],
+  proud: ["c"],
+  writing: ["d"],
   // Deliberately the same as Writing: replying is the agent putting words on the screen, which is
   // near enough to writing that a separate pose would be a distinction without a difference.
-  replying: "d",
-  waiting_for_input: "e",
+  replying: ["d"],
+  waiting_for_input: ["e"],
+  // Idle, with the book glowing and lighting her face: nothing for the user to do, and something
+  // still going on. `light` keys only the glow — two slots' colour and its bone's scale — and none
+  // of Remi, so on its own she stands frozen in the setup pose. Layered over `a` she rests as in
+  // idle, and the glow, whose bone hangs off `a`'s book, moves with it. Its light reaches past
+  // `c`'s raised arm, so it widens the framing (`measureFit`) and Remi draws ~95 % of the size
+  // she would without it.
+  background: ["a", "light"],
   // No session running: the same empty-handed rest as `idle`, told apart from it by the grey
   // `offline` treatment in index.html rather than by a pose of its own.
   //
@@ -34,7 +42,7 @@ const ANIMATION = {
   // right-clicking Remi — a pet that fades out is a pet with no way back. Resting is the trade,
   // and it costs the plan's other loop mitigation: Offline animates, so the loop no longer
   // stops for it and `visibilitychange` is the one left.
-  offline: "a",
+  offline: ["a"],
 };
 
 /// Seconds of cross-fade between two poses. Spine's `AnimationState` blends bone-for-bone, which
@@ -114,13 +122,23 @@ export function setState(petState, opts = {}) {
   // A state this renderer does not know: keep whatever is playing rather than blanking her.
   // Every state the pet sends has an animation, so this is only reachable from a pet newer than
   // the webview it is serving.
-  const name = ANIMATION[petState];
-  if (!name) return;
+  const layers = ANIMATION[petState];
+  if (!layers) return;
 
-  const entry = animationState.setAnimation(0, name, true);
   // `transition: false` is for the first pose after mount and for a jump the user should not see
   // blended — anything else crossfades on `defaultMix`.
-  if (opts.transition === false) entry.mixDuration = 0;
+  const mix = opts.transition === false ? 0 : MIX_SECONDS;
+  layers.forEach((name, track) => {
+    // A layer already playing carries on, so going between idle and background only brings the
+    // glow in or out rather than restarting Remi's loop under it.
+    if (animationState.getCurrent(track)?.animation.name === name) return;
+    animationState.setAnimation(track, name, true).mixDuration = mix;
+  });
+  // Fading a track above 0 to empty hands its slots back to the track below — safe here, unlike
+  // on track 0 (see `offline` above). The glow's slots rest at alpha 0, so it fades out.
+  for (let track = layers.length; track < animationState.tracks.length; track++) {
+    if (animationState.getCurrent(track)) animationState.setEmptyAnimation(track, mix);
+  }
 }
 
 export function dispose() {
@@ -153,13 +171,18 @@ function measureFit(skeletonData) {
   let maxX = -Infinity;
   let maxY = -Infinity;
 
-  for (const name of new Set(Object.values(ANIMATION))) {
-    const animation = skeletonData.findAnimation(name);
-    // A rename in a re-exported asset should fail here, at load, and not as a state that silently
-    // never plays.
-    if (!animation) throw new Error(`skeleton has no animation "${name}"`);
+  // Each distinct stack once: `idle` and `offline` play the same one.
+  const poses = new Map(Object.values(ANIMATION).map((layers) => [String(layers), layers]));
+  for (const layers of poses.values()) {
+    const animations = layers.map((name) => {
+      const animation = skeletonData.findAnimation(name);
+      // A rename in a re-exported asset should fail here, at load, and not as a state that
+      // silently never plays.
+      if (!animation) throw new Error(`skeleton has no animation "${name}"`);
+      return animation;
+    });
 
-    // A skeleton of its own per animation, never the one being drawn, and never shared between
+    // A skeleton of its own per pose, never the one being drawn, and never shared between
     // two measurements: posing a skeleton leaves slot attachments behind — an animation only
     // resets the slots it keys — and it leaves the physics mid-swing, which is state the next
     // animation would start from and the renderer never would.
@@ -167,9 +190,11 @@ function measureFit(skeletonData) {
     const probe = new spine.AnimationState(new spine.AnimationStateData(skeletonData));
     // Looping, and run for a whole cycle, because that is how the pet plays it: the hair reaches
     // its extreme on the swing back into the loop point, which a single pass does not contain.
-    probe.setAnimation(0, name, true);
+    layers.forEach((name, track) => probe.setAnimation(track, name, true));
 
-    const steps = Math.ceil(animation.duration / FIT_STEP_SECONDS);
+    // Long enough for the longest layer to come round, and so for every shorter one to as well.
+    const duration = Math.max(...animations.map((animation) => animation.duration));
+    const steps = Math.ceil(duration / FIT_STEP_SECONDS);
     for (let i = 0; i <= steps; i++) {
       const delta = i === 0 ? 0 : FIT_STEP_SECONDS;
       probe.update(delta);

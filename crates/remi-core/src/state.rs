@@ -18,6 +18,12 @@ pub enum PetState {
     Proud,
     /// Between turns: what `Proud` fades into, or an explicitly interrupted turn.
     Idle,
+    /// Between turns, with work the turn started in the background still running.
+    ///
+    /// Shown by the pet only, never written: a turn that ends that way is recorded as `Proud`
+    /// with [`SessionRecord::background`](crate::record::SessionRecord::background) set, so a pet
+    /// older than this state, which would reject a record carrying it, still reads the record.
+    Background,
     /// The session has ended.
     Offline,
 }

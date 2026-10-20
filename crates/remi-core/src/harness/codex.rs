@@ -35,6 +35,7 @@ pub(super) fn parse(json: &[u8]) -> Result<HookInput, serde_json::Error> {
         session: payload.session_id,
         cwd: payload.cwd.as_deref().and_then(normalize::cwd_name),
         transcript: payload.transcript_path,
+        launched_background: false,
     })
 }
 

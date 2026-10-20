@@ -86,6 +86,9 @@ pub struct HookInput {
     pub cwd: Option<String>,
     /// The harness's transcript of the session, where its title can be looked up.
     pub transcript: Option<PathBuf>,
+    /// The tool call this event reports on left work running in the background, which the
+    /// harness picks back up once it finishes.
+    pub launched_background: bool,
 }
 
 #[derive(Debug, thiserror::Error)]

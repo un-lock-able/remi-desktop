@@ -585,6 +585,7 @@ fn pose(state: PetState) -> &'static str {
         PetState::WaitingForInput => "waiting",
         PetState::Proud => "done",
         PetState::Idle => "idle",
+        PetState::Background => "background",
         PetState::Offline => "offline",
     }
 }
