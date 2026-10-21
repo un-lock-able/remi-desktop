@@ -15,7 +15,7 @@ remote writes a state file; nothing has to stay connected for the state to stay 
 
 ## States
 
-One session, eight states — seven poses, since Writing and Replying share one. Remi holds
+One session, nine states — eight poses, since Writing and Replying share one. Remi holds
 whichever state that session is in until an event moves her out of it.
 
 |                                                              | state                      | when she shows it                                                                                                                                                            |
@@ -26,6 +26,7 @@ whichever state that session is in until an event moves her out of it.
 | <img src="assets/preview/waiting-for-input.gif" width="110"> | **Waiting for input**      | **Blocked on you** — a permission prompt, or a question. The state the whole pet exists for: she sits there waiting and you notice without watching the terminal.            |
 | <img src="assets/preview/proud.gif" width="110">             | **Proud**                  | The turn just landed. Fades to Idle after a few seconds.                                                                                                                     |
 | <img src="assets/preview/idle.gif" width="110">              | **Idle**                   | Between turns: what Proud fades into, or a turn you interrupted. Empty-handed rest.                                                                                          |
+| <img src="assets/preview/background.gif" width="110">        | **Background**             | The turn ended, but work it started is still running — a background command or subagent. Idle, with her book glowing. Claude Code only.                                      |
 | <img src="assets/preview/offline.gif" width="110">           | **Offline**                | No session — it ended, or the host went away. The same rest as Idle, greyed and dimmed so it reads as "nothing running" from across the room.                                |
 
 The previews are the GIF art, downscaled. The app renders the Spine skeleton, which is the same
@@ -40,7 +41,7 @@ Grab the latest release. In short:
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | macOS 11+                               | `Remi-*-macos-universal.app.tar.gz` → `/Applications`, then `xattr -dr com.apple.quarantine /Applications/Remi.app` |
 | Windows 10/11                           | `Remi-*-windows-x86_64.msi` or `-setup.exe`                                                                         |
-| Linux x86_64                            | `Remi-*-linux-x86_64.deb` or `.AppImage` — X11 / XWayland recommended                                               |
+| Linux x86_64                            | `Remi-*-linux-x86_64.deb` or `.AppImage`                                                                            |
 | macOS or Linux machine running an agent | `curl -fsSL .../releases/latest/download/install.sh \| sh -s -- --harness claude-code --check`                      |
 | Windows machine running an agent        | `install.ps1` from the same release — see [Agent hook setup](#agent-hook-setup)                                     |
 
@@ -56,10 +57,9 @@ The release workflow builds `.deb` and AppImage packages for Linux x86_64. Insta
 with `sudo apt install ./Remi-*-linux-x86_64.deb`, or make the AppImage executable and run it.
 For a checkout whose changes have not been released yet, build locally using the commands below.
 
-Remi prefers **X11 / XWayland**, which allows position restoration and always-on-top requests.
-GTK falls back to native Wayland if X11 is unavailable. An explicit `GDK_BACKEND` overrides
-this choice, for example `GDK_BACKEND=wayland remi-desktop` or `GDK_BACKEND=x11 remi-desktop`.
-Install/enable XWayland in a Wayland session for the full desktop-pet behavior.
+Remi uses **native Wayland** when it is available and falls back to X11 otherwise. An explicit
+`GDK_BACKEND` overrides this choice, for example `GDK_BACKEND=x11 remi-desktop` to run under
+XWayland, which allows position restoration and always-on-top requests.
 
 Native Wayland still leaves positioning, stacking and taskbar visibility to the compositor.
 On KDE Plasma, add a window rule (System Settings → Window Management → Window Rules)

@@ -48,9 +48,9 @@ fn context_menu(app: tauri::AppHandle, x: f64, y: f64) {
 }
 
 fn main() {
-    // Before GTK/Tauri opens a display: X11 (including XWayland) lets a desktop pet
-    // restore its position and request always-on-top. Fall back to native Wayland;
-    // an explicit GDK_BACKEND remains authoritative.
+    // Before GTK/Tauri opens a display: native Wayland first, falling back to X11. Wayland
+    // leaves position and always-on-top to the compositor; `GDK_BACKEND=x11` (XWayland) gets
+    // them back, since an explicit GDK_BACKEND remains authoritative.
     #[cfg(target_os = "linux")]
     gdk::set_allowed_backends("wayland,x11");
 

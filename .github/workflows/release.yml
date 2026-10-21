@@ -4,7 +4,7 @@
 #   * `remi-hook` — the write path. Linux first-class, because the remote is almost always a
 #     headless Linux box; macOS and Windows too, because the pet needs a hook for its own
 #     machine's `local` connection.
-#   * the pet — macOS, Windows, and Linux (X11/XWayland preferred).
+#   * the pet — macOS, Windows, and Linux (native Wayland preferred).
 #
 # The tag may carry a pre-release suffix (`v0.1.0-beta.1`); the *bundle* version never does.
 # It comes from Cargo.toml, and WiX rejects any pre-release identifier that is not numeric, so

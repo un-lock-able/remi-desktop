@@ -2,12 +2,11 @@ Remi is a desktop pet that shows what your coding agent is doing — on this mac
 
 Remi is harness-neutral by design: adapters report neutral events and one reducer turns those into poses. **Claude Code and Codex have hook adapters**; OpenCode is next.
 
-## Since beta.4
+## Since beta.5
 
-- **A Windows machine running an agent can be set up from PowerShell.** `install.ps1` ships beside the binaries and resolves the same asset names and the same `SHASUMS256.txt` as `install.sh` — see below for the incantation that gets arguments past the execution policy (dbb81f6)
-- **Codex hooks launch on Windows.** Each hook is now written twice: `command` for a POSIX shell, and `commandWindows`, the same path unquoted. Codex runs the override through `cmd.exe /d /c "<command>"`, which loses a command whose first character is a quote, so the quoted POSIX spelling never started there. The override is written on every platform, so one `CODEX_HOME` shared between machines says the same thing on each (dbb81f6)
-- Hooks an earlier Remi wrote, without that override, are still recognised as hers — `check` reports them and `uninstall` takes them out — but no longer match what `setup` writes, so `check` sends you to run `setup` again (dbb81f6)
-- The README now shows **what each of the seven poses looks like** (3412a23)
+- **Remi shows when a turn leaves work running.** A new **Background** pose — idle, with her book glowing and lighting her face — replaces Proud when the turn that just ended started a background command or subagent, and holds until the agent starts a turn to report the result. Claude Code only for now; the GIF fallback shows it as plain Idle (7d0d21e)
+- **Linux uses native Wayland by default**, falling back to X11. Set `GDK_BACKEND=x11` to run under XWayland for position restoration and always-on-top (c501eae)
+- The README shows the new pose alongside the other seven
 
 ## Install the pet
 
@@ -24,9 +23,9 @@ Remi has no Dock icon. Her session menu is in the **menu bar**, and a **right-cl
 **Windows 10/11** — download either `Remi-*-windows-x86_64.msi` or `Remi-*-windows-x86_64-setup.exe`. Also unsigned, so SmartScreen will warn: *More info* → *Run anyway*.
 
 **Linux x86_64** — download `Remi-*-linux-x86_64.deb` or `.AppImage`. Install the deb with
-`sudo apt install ./Remi-*-linux-x86_64.deb`, or `chmod +x` the AppImage and run it. Remi prefers
-X11 / XWayland for position restoration and always-on-top; native Wayland falls back to compositor
-window rules. These packages are Spine-only, like the macOS and Windows builds; if the pet never
+`sudo apt install ./Remi-*-linux-x86_64.deb`, or `chmod +x` the AppImage and run it. Remi uses
+native Wayland, which leaves positioning and always-on-top to compositor window rules; run with
+`GDK_BACKEND=x11` to use XWayland instead. These packages are Spine-only, like the macOS and Windows builds; if the pet never
 appears, WebKitGTK could not composite the WebGL canvas — install the `-gif-fallback` package
 instead. GNOME needs AppIndicator support for the tray.
 
