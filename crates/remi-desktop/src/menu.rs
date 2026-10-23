@@ -402,7 +402,7 @@ pub fn on_event(app: &AppHandle, id: &str) {
         Action::Show(key) => select(app, Selection::Pinned(key)),
         Action::Connect(connection) => connect(app, connection),
         Action::Disconnect(connection) => disconnect(app, connection),
-        Action::Resize(named) => resize(app, named),
+        Action::Resize(named) => resize(app, Size::Named(named)),
         Action::Visible(shown) => visible(app, shown),
         // The pet has no window to close and no dock icon, so this is the only way out.
         Action::Quit => app.exit(0),
@@ -483,12 +483,25 @@ fn visible(app: &AppHandle, shown: bool) {
 
 /// Resizes the window and remembers the new size. The renderer refits itself to whatever it is
 /// given, so nothing has to be told about this.
-fn resize(app: &AppHandle, named: NamedSize) {
-    let size = Size::Named(named);
+fn resize(app: &AppHandle, size: Size) {
     save(app, |config| config.size = size);
     if let Some(pet) = window::pet(app) {
         window::resize(&pet, size.edge());
     }
+}
+
+/// Makes the pet one step bigger or smaller, from the keyboard shortcut.
+///
+/// The tray is refreshed by hand for the same reason [`visible`] does it: this is not a menu
+/// click, and the Size submenu's tick has to come off the named size she is no longer.
+pub fn change_size(app: &AppHandle, bigger: bool) {
+    let size = {
+        let config = app.state::<Arc<Mutex<Config>>>();
+        let config = config.lock().expect("config mutex poisoned");
+        config.size.changed(bigger)
+    };
+    resize(app, size);
+    crate::tray::refresh(app);
 }
 
 /// Applies a change to the live config and queues the file write. Both halves matter: the live

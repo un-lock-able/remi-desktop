@@ -93,6 +93,9 @@ impl Size {
     /// the user can neither see nor grab to fix.
     const RANGE: std::ops::RangeInclusive<f64> = 96.0..=720.0;
 
+    /// How far one press of the size shortcut moves her edge, in logical pixels.
+    const STEP: f64 = 10.0;
+
     pub fn edge(self) -> f64 {
         let edge = match self {
             Size::Named(NamedSize::Small) => 180.0,
@@ -101,6 +104,14 @@ impl Size {
             Size::Pixels(px) => px,
         };
         edge.clamp(*Self::RANGE.start(), *Self::RANGE.end())
+    }
+
+    /// This size one [`Self::STEP`] bigger, or smaller. Always a pixel count, even from a named
+    /// size, and clamped to the same range as one written by hand — so holding the shortcut down
+    /// stops at the edge instead of drifting past it.
+    pub fn changed(self, bigger: bool) -> Size {
+        let delta = if bigger { Self::STEP } else { -Self::STEP };
+        Size::Pixels((self.edge() + delta).clamp(*Self::RANGE.start(), *Self::RANGE.end()))
     }
 }
 
@@ -377,6 +388,17 @@ mod tests {
                 .edge(),
             720.0
         );
+    }
+
+    #[test]
+    fn a_size_change_steps_from_any_size_and_stops_at_the_range() {
+        assert_eq!(
+            Size::Named(NamedSize::Medium).changed(true),
+            Size::Pixels(270.0)
+        );
+        assert_eq!(Size::Pixels(300.0).changed(false), Size::Pixels(290.0));
+        assert_eq!(Size::Pixels(100.0).changed(false), Size::Pixels(96.0));
+        assert_eq!(Size::Pixels(720.0).changed(true), Size::Pixels(720.0));
     }
 
     #[test]

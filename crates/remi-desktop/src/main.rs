@@ -47,6 +47,13 @@ fn context_menu(app: tauri::AppHandle, x: f64, y: f64) {
     menu::popup(&app, LogicalPosition::new(x, y));
 }
 
+/// Makes the pet one step bigger or smaller, which `ui/app.js` asks for on Cmd/Ctrl `=` and `-`.
+/// Only the direction comes from JavaScript; how far a step goes is `config.rs`'s to decide.
+#[tauri::command]
+fn change_size(app: tauri::AppHandle, bigger: bool) {
+    menu::change_size(&app, bigger);
+}
+
 fn main() {
     // Before GTK/Tauri opens a display: native Wayland first, falling back to X11. Wayland
     // leaves position and always-on-top to the compositor; `GDK_BACKEND=x11` (XWayland) gets
@@ -78,7 +85,12 @@ fn main() {
     let builder = builder.plugin(tauri_nspanel::init());
 
     builder
-        .invoke_handler(tauri::generate_handler![renderer, pet_state, context_menu])
+        .invoke_handler(tauri::generate_handler![
+            renderer,
+            pet_state,
+            context_menu,
+            change_size
+        ])
         .setup(move |app| {
             // `LSUIElement` in Info.plist is not enough on its own: tao sets the activation
             // policy to `Regular` at startup, which overrides the plist key and puts the Dock

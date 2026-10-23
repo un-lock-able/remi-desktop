@@ -165,9 +165,26 @@ function openContextMenu(at) {
   });
 }
 
+/// Cmd on macOS, Ctrl everywhere else — the same modifier every app there zooms with.
+const MAC = /Mac/.test(navigator.platform);
+
 /// Digits pick a state directly, arrows step through them, so every pose can be reached without an
 /// agent running. The window takes focus on click like any other.
+///
+/// Cmd/Ctrl `=` and `-` make her bigger and smaller. `+` and `_` too, which is the same key with
+/// Shift held, so a slightly late finger on Shift still counts. Only the direction is sent: how
+/// far a step goes, and where it stops, is Rust's.
 function onKeyDown(event) {
+  const modifier = MAC ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+  if (modifier && !event.altKey) {
+    const bigger = { "=": true, "+": true, "-": false, "_": false }[event.key];
+    if (bigger === undefined) return;
+    event.preventDefault();
+    tauri?.core?.invoke("change_size", { bigger }).catch((err) => {
+      console.error("could not resize the pet:", err);
+    });
+    return;
+  }
   if (event.metaKey || event.ctrlKey || event.altKey) return;
 
   let next = null;

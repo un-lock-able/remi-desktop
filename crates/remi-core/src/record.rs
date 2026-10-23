@@ -39,7 +39,11 @@ pub struct SessionRecord {
     #[serde(rename = "_resume", default, skip_serializing_if = "Option::is_none")]
     pub resume: Option<PetState>,
     /// Writer-private: the current turn has started work in the background.
-    #[serde(rename = "_launched", default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(
+        rename = "_launched",
+        default,
+        skip_serializing_if = "std::ops::Not::not"
+    )]
     pub launched: bool,
 }
 

@@ -76,6 +76,11 @@ pub fn configure(window: &WebviewWindow, config: &Arc<Mutex<Config>>, saver: Sav
 /// would throw the user out of the full-screen Space they are working in — which would make the
 /// pet visible there and useless there in the same gesture.
 ///
+/// **But still taking keys.** `can_become_key_window` is what lets a click hand her the keyboard
+/// — the Cmd `=`/`-` size shortcut and the pose keys in `ui/app.js` — and a non-activating panel
+/// becomes key *without* activating the app, so the Space stays where it is. Main window she never
+/// becomes: that is the activating half.
+///
 /// The level is the menu bar's rather than higher: `NSPopUpMenuWindowLevel` and above is where
 /// menus live, and the pet's own right-click menu has to open in front of her. `main.rs` making
 /// the app an accessory is the last prerequisite — a regular app in the Dock does not float over
@@ -87,7 +92,7 @@ fn follow_fullscreen(window: &WebviewWindow) {
     tauri_panel! {
         panel!(PetPanel {
             config: {
-                can_become_key_window: false,
+                can_become_key_window: true,
                 can_become_main_window: false,
                 is_floating_panel: true
             }
