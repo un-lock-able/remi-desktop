@@ -1441,9 +1441,9 @@ build it is.
 | artifact | targets | runner |
 |---|---|---|
 | `remi-hook` | `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl` | `ubuntu-latest` + `cross` |
-| `remi-hook` | `x86_64-apple-darwin` + `aarch64-apple-darwin`, `lipo`'d into one universal binary | `macos-14` |
+| `remi-hook` | `x86_64-apple-darwin` + `aarch64-apple-darwin`, `lipo`'d into one universal binary | `macos-latest` |
 | `remi-hook` | `x86_64-pc-windows-msvc` | `windows-latest` |
-| `remi-desktop` | universal `.app` in a `.tar.gz`; `.msi` + NSIS `.exe` | `macos-14`, `windows-latest` |
+| `remi-desktop` | universal `.app` in a `.tar.gz`; `.msi` + NSIS `.exe` | `macos-latest`, `windows-latest` |
 | `remi-desktop` on Linux | **x86_64**; X11/XWayland preferred, native Wayland requires compositor rules (brief §7) | `.deb`, `.AppImage`, each also as `-gif-fallback` carrying the GIF art (§5.5) |
 | `install.sh` + `install.ps1` + `SHASUMS256.txt` | — | attached to the release |
 
