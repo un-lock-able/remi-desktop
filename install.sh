@@ -14,7 +14,8 @@
 # which agent a machine runs is the one thing an installer must not guess.
 #
 # Environment:
-#   REMI_VERSION   release tag to install (default: the latest release)
+#   REMI_VERSION   exact release tag, including v (default: the latest stable release)
+#                  required for a beta, since GitHub's latest alias excludes pre-releases
 #   REMI_HOOK_BIN  path to a locally built remi-hook to install instead of downloading; this is
 #                  what makes the install path testable before any release exists
 #   REMI_REPO      owner/name on GitHub, if you forked it
@@ -50,8 +51,8 @@ asset_name() {
     esac
 }
 
-# `latest/download/<asset>` is GitHub's own alias and saves an API call, which also keeps this
-# script working against a rate-limited or unauthenticated network.
+# `latest/download/<asset>` selects a stable release only. For a beta (or before the first
+# stable release), REMI_VERSION must select a published tag from https://github.com/$REPO/releases.
 release_url() {
     if [ -n "${REMI_VERSION:-}" ]; then
         echo "https://github.com/$REPO/releases/download/$REMI_VERSION/$1"
@@ -90,7 +91,7 @@ sha256_of() {
 # SHASUMS256.txt, rather than warning and continuing.
 verify() {
     # $1 downloaded file, $2 asset name, $3 sums file
-    expected="$(grep -E "[[:space:]]\*?$2\$" "$3" | cut -d' ' -f1 | head -n1)"
+    expected="$(awk -v asset="$2" '$2 == asset || $2 == "*" asset { print $1; exit }' "$3")"
     [ -n "$expected" ] || die "$2 is not listed in SHASUMS256.txt — wrong release, or a partial upload"
     actual="$(sha256_of "$1")"
     [ "$expected" = "$actual" ] || die "checksum mismatch for $2: expected $expected, got $actual"
@@ -112,12 +113,15 @@ else
 
     say "downloading $asset"
     fetch "$(release_url "$asset")" "$tmp/$asset" \
-        || die "could not download $asset — check REMI_VERSION, or that the release has that asset"
+        || die "could not download $asset — set REMI_VERSION to an exact published tag for a beta; otherwise a stable release with this asset must exist at https://github.com/$REPO/releases"
     fetch "$(release_url SHASUMS256.txt)" "$tmp/SHASUMS256.txt" \
         || die "could not download SHASUMS256.txt"
     verify "$tmp/$asset" "$asset" "$tmp/SHASUMS256.txt"
 
     cp "$tmp/$asset" "$TARGET.tmp"
+    # exec below replaces this shell, so its EXIT trap would never run on success.
+    rm -rf "$tmp"
+    trap - EXIT INT TERM
 fi
 
 chmod 755 "$TARGET.tmp"

@@ -17,7 +17,8 @@ what that command's flags mean. `--harness` is one of them and has no default he
 which agent a machine runs is the one thing an installer must not guess.
 
 Environment:
-  REMI_VERSION   release tag to install (default: the latest release)
+  REMI_VERSION   exact release tag, including v (default: the latest stable release)
+                 required for a beta, since GitHub's latest alias excludes pre-releases
   REMI_HOOK_BIN  path to a locally built remi-hook.exe to install instead of downloading
   REMI_REPO      owner/name on GitHub, if you forked it
   REMI_PREFIX    directory to install into (default: $env:USERPROFILE\.local\bin)
@@ -53,8 +54,8 @@ function Get-AssetName {
     }
 }
 
-# `latest/download/<asset>` is GitHub's own alias and saves an API call, which also keeps this
-# script working against a rate-limited or unauthenticated network.
+# `latest/download/<asset>` selects a stable release only. For a beta (or before the first
+# stable release), REMI_VERSION must select a published tag from https://github.com/$repo/releases.
 function Get-ReleaseUrl($asset) {
     if ($env:REMI_VERSION) {
         "https://github.com/$repo/releases/download/$env:REMI_VERSION/$asset"
@@ -117,7 +118,7 @@ if ($env:REMI_HOOK_BIN) {
         try {
             Save-File (Get-ReleaseUrl $asset) (Join-Path $tmp $asset)
         } catch {
-            Die "could not download $asset — check REMI_VERSION, or that the release has that asset"
+            Die "could not download $asset — set REMI_VERSION to an exact published tag for a beta; otherwise a stable release with this asset must exist at https://github.com/$repo/releases"
         }
         try {
             Save-File (Get-ReleaseUrl 'SHASUMS256.txt') (Join-Path $tmp 'SHASUMS256.txt')
