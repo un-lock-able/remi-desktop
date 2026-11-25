@@ -2,13 +2,20 @@ Remi is a desktop pet that shows what your coding agent is doing — on this mac
 
 Remi is harness-neutral by design: adapters report neutral events and one reducer turns those into poses. **Claude Code and Codex have hook adapters**; OpenCode is next.
 
-## Since beta.5
+This is Remi's first stable release.
 
-- **Remi shows when a turn leaves work running.** A new **Background** pose — idle, with her book glowing and lighting her face — replaces Proud when the turn that just ended started a background command or subagent, and holds until the agent starts a turn to report the result. Claude Code only for now; the GIF fallback shows it as plain Idle (7d0d21e)
-- **Linux uses native Wayland by default**, falling back to X11. Set `GDK_BACKEND=x11` to run under XWayland for position restoration and always-on-top (c501eae)
-- The README shows the new pose alongside the other seven
+## Changes since beta.6
+
+- **Resize with the keyboard.** Click Remi to focus her, then press Cmd on macOS or
+  Ctrl on Windows and Linux together with `+` or `-`.
+- **Hook installer fixes.** The macOS and Linux installer matches checksum entries by exact
+  filename and removes its temporary download directory after a successful install.
+- **Updated installation guide.** The README covers desktop and hook setup separately and
+  shows how to install from source on macOS, Linux, and Windows.
 
 ## Install the pet
+
+Download packages from the [public GitHub releases page](https://github.com/un-lock-able/remi-desktop/releases).
 
 **macOS** (11+, Intel and Apple Silicon) — download `Remi-*-macos-universal.app.tar.gz`, unpack it, and move `Remi.app` to `/Applications`. The build is **not signed**, so Gatekeeper will refuse it on first launch. Clear the quarantine flag:
 
@@ -31,7 +38,8 @@ instead. GNOME needs AppIndicator support for the tray.
 
 ## Teach a machine to talk to her
 
-Every machine running an agent — including your laptop — needs `remi-hook`, which writes what the agent is doing to a small state file. One command, on that machine:
+Every machine running an agent — including your laptop — needs `remi-hook`, which writes what
+the agent is doing to a small state file. To install the latest **stable** release on that machine:
 
 ```sh
 curl -fsSL https://github.com/un-lock-able/remi-desktop/releases/latest/download/install.sh \
@@ -50,9 +58,7 @@ Check with `remi-hook check --harness codex`; remove with `remi-hook uninstall -
 Use a Codex runtime with lifecycle-hook support. Reply streaming and arbitrary shell-command
 classification are not available through this adapter.
 
-**On Windows**, PowerShell installs the same binary. The execution policy blocks a downloaded
-script, so build it in memory rather than saving it — which is also what lets you pass it the
-arguments `irm | iex` cannot:
+**On Windows**, use PowerShell to install and configure the hook for Codex:
 
 ```powershell
 & ([scriptblock]::Create((Invoke-RestMethod `
@@ -67,13 +73,31 @@ emulation. If you install by hand instead, keep the binary named `remi-hook.exe`
 setup recognises its own hooks, and put it somewhere **without a space in the path**: on
 Windows a Codex hook command has no working form for a path containing one.
 
+**To install a specific release**, including a beta, download `install.sh` or `install.ps1` from
+that release's assets and set `REMI_VERSION` to its exact tag. These commands install `v0.1.6`:
+
+```sh
+REMI_VERSION=v0.1.6 sh ./install.sh --harness claude-code --check
+```
+
+```powershell
+$env:REMI_VERSION = 'v0.1.6'
+& ([scriptblock]::Create((Get-Content -Raw -Encoding UTF8 ./install.ps1))) --harness codex --check
+Remove-Item Env:REMI_VERSION
+```
+
+Replace the example tag with the release you downloaded. Use `--harness codex` on macOS or
+Linux for Codex. If the install directory is not on `PATH`, run `check` or `uninstall` using
+`~/.local/bin/remi-hook` or `& "$env:USERPROFILE\.local\bin\remi-hook.exe"` on Windows.
+
 To undo Claude Code setup: `remi-hook uninstall --harness claude-code`. `--purge` is not implemented.
 
-## Known limits in this beta
+## Known limits
 
 - **Nothing is code-signed.** See the quarantine and SmartScreen notes above.
 - **The pet does not install the hook for you.** Even for your own machine, run the script above.
 - **No autostart.** Add Remi to your login items yourself.
+- **Claude Code interruption tracking is incomplete.** Ctrl+C may leave Remi showing the previous working state. Codex interruption was manually verified to return her to Idle; the Claude Code fix is deferred ([#5](https://github.com/un-lock-able/remi-desktop/issues/5)).
 - **Claude Code hooks do not run on Windows.** Its settings schema rejects unknown keys in a hook entry, so Remi cannot write the `commandWindows` override there; a file that fails that schema stops Claude Code with a dialog at session start. Codex is the harness to use on a Windows agent machine for now.
 - **OpenCode is not implemented.** `--harness opencode` is accepted by the CLI but its plugin is not written yet.
 
